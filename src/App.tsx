@@ -1,18 +1,15 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import LoginPage from './pages/LoginPage';
-import ChatBotInterface from './components/ChatBotInterface';
-// import About from './pages/About';
-// import Contact from './pages/Contact';
+import Router from './router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+
+const queryClient = new QueryClient()
 
 const App: React.FC = () => {
 
   return (
-    <>
-      <ChatBotInterface/>
-    </>
+    <QueryClientProvider client={queryClient}>
+      <Router />
+    </QueryClientProvider>
   )
 }
 
