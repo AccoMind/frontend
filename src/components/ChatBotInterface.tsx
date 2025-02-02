@@ -2,38 +2,67 @@ import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Menu, Send, User } from "lucide-react";
-
-interface Message {
-  id: number;
-  text: string;
-  sender: "user" | "bot";
-}
+import { useNavigate, useParams } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import ChatService from "@/services/chatService";
+import { Message } from "@/types/message";
 
 const ChatBotInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
 
+  const navigate = useNavigate();
+
+  const queryClient = useQueryClient();
+
+  const { id } = useParams();
+
+
+  const query = useQuery(
+    {
+      queryKey: ["messages", { id }],
+      queryFn: () => ChatService.getChatById(id!),
+      enabled: !!id,
+    }
+  )
+
+  const mutation = useMutation({
+    mutationFn: (message: string) => ChatService.newChatMessage(id!, message),
+    onError: (error, variables, context) => {
+      console.log(error)
+      queryClient.setQueryData(["messages", { id }], context)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(["messages", { id }])
+    }
+  })
+
+  const newChatMutation = useMutation({
+    mutationFn: (message: string) => ChatService.createChat({ message }),
+    onSettled: (data) => {
+      console.log(data)
+      navigate(`/${data?.data.chat_id}`)
+      queryClient.invalidateQueries(["messages", { id }])
+    }
+  })
+
+
   const handleSendMessage = () => {
     if (newMessage.trim() === "") return;
 
     const userMessage: Message = {
-      id: Date.now(),
-      text: newMessage,
-      sender: "user",
+      message: newMessage,
+      source: "user",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
+
+    if (id)
+      mutation.mutate(newMessage);
+    else
+      newChatMutation.mutate(newMessage);
 
     setMessages((prevMessages) => [...prevMessages, userMessage]);
-
-    // Simulate a bot response
-    const botMessage: Message = {
-      id: Date.now() + 1,
-      text: "This is an example bot response.",
-      sender: "bot",
-    };
-
-    setTimeout(() => {
-      setMessages((prevMessages) => [...prevMessages, botMessage]);
-    }, 1000);
 
     setNewMessage("");
   };
@@ -66,21 +95,19 @@ const ChatBotInterface: React.FC = () => {
       <main className="flex-1 flex flex-col">
         {/* Chat Messages */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4">
-          {messages.map((message) => (
+          {query.data?.data.messages.map((message) => (
             <div
               key={message.id}
-              className={`flex ${
-                message.sender === "user" ? "justify-end" : "justify-start"
-              }`}
+              className={`flex ${message.source === "user" ? "justify-end" : "justify-start"
+                }`}
             >
               <div
-                className={`max-w-xs p-3 rounded-lg shadow ${
-                  message.sender === "user"
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 text-gray-900"
-                }`}
+                className={`max-w-xs p-3 rounded-lg shadow ${message.source === "user"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-900"
+                  }`}
               >
-                {message.text}
+                {message.message}
               </div>
             </div>
           ))}
